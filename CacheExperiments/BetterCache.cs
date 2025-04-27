@@ -2,51 +2,63 @@
 
 public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue>
 {
+#if NET9_OR_GREATER
+    private readonly System.Threading.Lock _lock = new();
+#else
+    private readonly object _lock = new();
+#endif  
+
     private readonly ListItem[] _items = new ListItem[capacity];
     private int _firstIndex = -1;
     private int _lastIindex = -1;
-    private int _firstAvailbleIndex = 0;
+    private int _firstAvailbleIndex = capacity - 1;
 
     public TValue AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
     {
-        TValue newValue;
-        if (TryGetKeyIndex(key, out int index))
+        lock (_lock)
         {
-            var oldValue = GetValue(index);
-            newValue = updateValueFactory(key, oldValue);
-            SetValue(index, newValue);
-            MoveToTop(index);
-        }
-        else
-        {
-            newValue = addValueFactory(key);
-            AddOnTop(key, newValue);
-        }
+            TValue newValue;
+            if (TryGetKeyIndex(key, out int index))
+            {
+                var oldValue = GetValue(index);
+                newValue = updateValueFactory(key, oldValue);
+                SetValue(index, newValue);
+                MoveToTop(index);
+            }
+            else
+            {
+                newValue = addValueFactory(key);
+                AddOnTop(key, newValue);
+            }
 
-        return newValue;
+            return newValue;
+        }
     }
 
     public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
     {
-        TValue value;
-        if (TryGetKeyIndex(key, out int index))
+        lock (_lock)
         {
-            value = GetValue(index);
-            MoveToTop(index);
-        }
-        else
-        {
-            value = factory(key);
-            AddOnTop(key, value);
-        }
+            TValue value;
+            if (TryGetKeyIndex(key, out int index))
+            {
+                value = GetValue(index);
+                MoveToTop(index);
+            }
+            else
+            {
+                value = factory(key);
+                AddOnTop(key, value);
+            }
 
-        return value;
+            return value;
+        }
     }
 
     private void AddOnTop(TKey key, TValue value)
     {
         ListItem newItem = new(-1, key, value, _firstIndex);
-        if (_firstAvailbleIndex < _items.Length)
+        if (_firstAvailbleIndex != -1)
         {
             if (_firstIndex == -1)
                 _lastIindex = _firstAvailbleIndex;
@@ -55,7 +67,7 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
 
             _items[_firstAvailbleIndex] = newItem;
             _firstIndex = _firstAvailbleIndex;
-            _firstAvailbleIndex++;
+            _firstAvailbleIndex--;
         }
         else
         {
