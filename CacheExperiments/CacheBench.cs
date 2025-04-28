@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CacheExperiments;
 
@@ -32,6 +33,17 @@ public class CacheBench
     }
 
     [Benchmark]
+    public void BestCaseMemory()
+    {
+        MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = CacheSize });
+        long key = 35;
+        for (int i = 0; i < 16384; i++)
+        {
+            cache.GetOrCreate(key, _ => 1, new() { Size = 1 });
+        }
+    }
+
+    [Benchmark]
     public void InBetweenCaseQD()
     {
         QDCache<long, int> cache = new(CacheSize);
@@ -54,6 +66,17 @@ public class CacheBench
     }
 
     [Benchmark]
+    public void InBetweenCaseMemory()
+    {
+        MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = CacheSize });
+        long key = 35;
+        for (int i = 0; i < 16384; i++)
+        {
+            cache.GetOrCreate(key + (i % (CacheSize / 2)), _ => 1, new() { Size = 1 });
+        }
+    }
+
+    [Benchmark]
     public void WorstCaseQD()
     {
         QDCache<long, int> cache = new(CacheSize);
@@ -72,6 +95,17 @@ public class CacheBench
         for (int i = 0; i < 16384; i++)
         {
             cache.GetOrAdd(key + i, _ => 1);
+        }
+    }
+
+    [Benchmark]
+    public void WorstCaseMemory()
+    {
+        MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = CacheSize });
+        long key = 35;
+        for (int i = 0; i < 16384; i++)
+        {
+            cache.GetOrCreate(key + i, _ => 1, new() { Size = 1 });
         }
     }
 }
