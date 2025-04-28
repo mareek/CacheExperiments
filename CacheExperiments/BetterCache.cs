@@ -1,6 +1,7 @@
 ﻿namespace CacheExperiments;
 
 public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue>
+    where TKey : notnull
 {
 #if NET9_OR_GREATER
     private readonly System.Threading.Lock _lock = new();
@@ -8,6 +9,7 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
     private readonly object _lock = new();
 #endif  
 
+    private readonly Dictionary<TKey, int> _keysIndex = new(capacity);
     private readonly ListItem[] _items = new ListItem[capacity];
     private int _firstIndex = -1;
     private int _lastIindex = -1;
@@ -18,7 +20,7 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         lock (_lock)
         {
             TValue newValue;
-            if (TryGetKeyIndex(key, out int index))
+            if (_keysIndex.TryGetValue(key, out int index))
             {
                 var oldValue = GetValue(index);
                 newValue = updateValueFactory(key, oldValue);
@@ -40,7 +42,7 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         lock (_lock)
         {
             TValue value;
-            if (TryGetKeyIndex(key, out int index))
+            if (_keysIndex.TryGetValue(key, out int index))
             {
                 value = GetValue(index);
                 MoveToTop(index);
@@ -71,13 +73,16 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         }
         else
         {
-            var newLastIndex = _items[_lastIindex].PreviousIndex;
+            var lastItem = _items[_lastIindex];
+            _keysIndex.Remove(lastItem.Key);
+            var newLastIndex = lastItem.PreviousIndex;
             _items[_lastIindex] = newItem;
             _items[_firstIndex] = _items[_firstIndex].WithPreviousIndex(_lastIindex);
             _items[newLastIndex] = _items[newLastIndex].WithNextIndex(-1);
             _firstIndex = _lastIindex;
             _lastIindex = newLastIndex;
         }
+        _keysIndex[key] = _firstIndex;
     }
 
     private TValue GetValue(int index) => _items[index].Value;
@@ -98,21 +103,6 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         _items[_firstIndex] = _items[_firstIndex].WithPreviousIndex(index);
         _items[index] = item.WithNextIndex(_firstIndex).WithPreviousIndex(-1);
         _firstIndex = index;
-    }
-
-    private bool TryGetKeyIndex(TKey key, out int index)
-    {
-        index = _firstIndex;
-        while (index != -1)
-        {
-            var currentItem = _items[index];
-            if (EqualityComparer<TKey>.Default.Equals(key, currentItem.Key))
-                return true;
-
-            index = currentItem.NextIndex;
-        }
-
-        return false;
     }
 
     private struct ListItem(int previousIndex, TKey key, TValue value, int nextIndex)
