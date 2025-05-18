@@ -1,5 +1,8 @@
 ﻿namespace CacheExperiments;
 
+/// <summary>
+/// A simple & lightweight cache in less than 2⁷ lines of code
+/// </summary>
 public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue>
     where TKey : notnull
 {
@@ -10,9 +13,11 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
 #endif  
 
     private readonly Dictionary<TKey, int> _keysIndex = new(capacity);
+
     private readonly ListItem[] _items = new ListItem[capacity];
     private int _firstIndex = -1;
     private int _lastIindex = -1;
+
     private int _firstAvailbleIndex = capacity - 1;
 
     public TValue AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
@@ -60,9 +65,9 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
     private void AddOnTop(TKey key, TValue value)
     {
         ListItem newItem = new(-1, key, value, _firstIndex);
-        if (_firstAvailbleIndex != -1)
+        if (_firstAvailbleIndex != -1) // there are still empty slots in _items
         {
-            if (_firstIndex == -1)
+            if (_firstIndex == -1) // first insertion
                 _lastIindex = _firstAvailbleIndex;
             else
                 _items[_firstIndex] = _items[_firstIndex].WithPreviousIndex(_firstAvailbleIndex);
@@ -105,7 +110,7 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         _firstIndex = index;
     }
 
-    private struct ListItem(int previousIndex, TKey key, TValue value, int nextIndex)
+    private readonly struct ListItem(int previousIndex, TKey key, TValue value, int nextIndex)
     {
         public int PreviousIndex { get; } = previousIndex;
         public TKey Key { get; } = key;
@@ -116,4 +121,25 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         public ListItem WithNextIndex(int index) => new(PreviousIndex, Key, Value, index);
         public ListItem WithValue(TValue value) => new(PreviousIndex, Key, value, NextIndex);
     }
+}
+
+public class BetterCacheAsync<TKey, TValue>(int capacity)
+    where TKey : notnull
+{
+    private readonly BetterCache<TKey, Task<TValue>> _innerCache = new(capacity);
+    public async Task<TValue> AddOrUpdateAsync(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
+        => await _innerCache.AddOrUpdate(key,
+                                         k => Task.Run(() => addValueFactory(k)),
+                                         async (k, v) => updateValueFactory(k, await v));
+
+    public async Task<TValue> AddOrUpdateAsync(TKey key, Func<TKey, Task<TValue>> addValueFactoryAsync, Func<TKey, TValue, Task<TValue>> updateValueFactoryAsync)
+        => await _innerCache.AddOrUpdate(key,
+                                         addValueFactoryAsync,
+                                         async (k, v) => await updateValueFactoryAsync(k, await v));
+
+    public async Task<TValue> GetOrAddAsync(TKey key, Func<TKey, TValue> factory)
+        => await GetOrAddAsync(key, k => Task.Run(() => factory(k)));
+
+    public async Task<TValue> GetOrAddAsync(TKey key, Func<TKey, Task<TValue>> factoryAsync)
+        => await _innerCache.GetOrAdd(key, factoryAsync);
 }
