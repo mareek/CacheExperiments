@@ -9,10 +9,11 @@ public class BetterCacheTest : SimpleCacheTest<BetterCache<string, int>>
 
 public class BetterCacheAsyncTest
 {
+    private const int runCount = 1000;
+
     [Fact]
     public async Task CheckThatAsyncCacheDoOnlyOneLoadOnAsyncGetOrAdd()
     {
-        const int runCount = 1000;
         int loadCount = 0;
         BetterCacheAsync<int, int> cache = new(10);
 
@@ -34,7 +35,6 @@ public class BetterCacheAsyncTest
     [Fact]
     public async Task CheckThatAsyncCacheDoOnlyOneLoadOnSyncGetOrAdd()
     {
-        const int runCount = 1000;
         int loadCount = 0;
         BetterCacheAsync<int, int> cache = new(10);
 
@@ -58,7 +58,6 @@ public class BetterCacheAsyncTest
     [Fact]
     public async Task CheckThatAsyncCacheDoOnlyOneLoadOnAsyncAddOrUpdate()
     {
-        const int runCount = 1000;
         int loadCount = 0;
         int updateCount = 0;
         BetterCacheAsync<int, int> cache = new(10);
@@ -82,7 +81,6 @@ public class BetterCacheAsyncTest
     [Fact]
     public async Task CheckThatAsyncCacheDoOnlyOneLoadOnSyncAddOrUpdate()
     {
-        const int runCount = 1000;
         int loadCount = 0;
         int updateCount = 0;
         BetterCacheAsync<int, int> cache = new(10);
