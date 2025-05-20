@@ -123,23 +123,9 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
     }
 }
 
-public class BetterCacheAsync<TKey, TValue>(int capacity)
+public class BetterCacheAsync<TKey, TValue>(int capacity) : BaseCacheAsync<TKey, TValue>(capacity)
     where TKey : notnull
 {
-    private readonly BetterCache<TKey, Task<TValue>> _innerCache = new(capacity);
-    public async Task<TValue> AddOrUpdateAsync(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
-        => await _innerCache.AddOrUpdate(key,
-                                         k => Task.FromResult(addValueFactory(k)),
-                                         async (k, v) => updateValueFactory(k, await v));
-
-    public async Task<TValue> AddOrUpdateAsync(TKey key, Func<TKey, Task<TValue>> addValueFactoryAsync, Func<TKey, TValue, Task<TValue>> updateValueFactoryAsync)
-        => await _innerCache.AddOrUpdate(key,
-                                         addValueFactoryAsync,
-                                         async (k, v) => await updateValueFactoryAsync(k, await v));
-
-    public async Task<TValue> GetOrAddAsync(TKey key, Func<TKey, TValue> factory)
-        => await GetOrAddAsync(key, k => Task.FromResult(factory(k)));
-
-    public async Task<TValue> GetOrAddAsync(TKey key, Func<TKey, Task<TValue>> factoryAsync)
-        => await _innerCache.GetOrAdd(key, factoryAsync);
+    protected override ISimpleCache<TKey, Task<TValue>> BuildInnerCache(int capacity)
+        => new BetterCache<TKey, Task<TValue>>(capacity);
 }
