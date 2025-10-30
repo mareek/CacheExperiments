@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using CacheExperiments.Caches;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace CacheExperiments;
@@ -50,7 +51,7 @@ public class CacheBench
         long key = 35;
         for (int i = 0; i < 16384; i++)
         {
-            cache.GetOrAdd(key + (i % (CacheSize / 2)), _ => 1);
+            cache.GetOrAdd(key + i % (CacheSize / 2), _ => 1);
         }
     }
 
@@ -61,7 +62,7 @@ public class CacheBench
         long key = 35;
         for (int i = 0; i < 16384; i++)
         {
-            cache.GetOrAdd(key + (i % (CacheSize / 2)), _ => 1);
+            cache.GetOrAdd(key + i % (CacheSize / 2), _ => 1);
         }
     }
 
@@ -72,7 +73,7 @@ public class CacheBench
         long key = 35;
         for (int i = 0; i < 16384; i++)
         {
-            cache.GetOrCreate(key + (i % (CacheSize / 2)), _ => 1, new() { Size = 1 });
+            cache.GetOrCreate(key + i % (CacheSize / 2), _ => 1, new() { Size = 1 });
         }
     }
 

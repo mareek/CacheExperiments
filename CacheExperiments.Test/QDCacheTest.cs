@@ -1,4 +1,6 @@
-﻿namespace CacheExperiments.Test;
+﻿using CacheExperiments.Caches;
+
+namespace CacheExperiments.Test;
 
 public class QDCacheTest : SimpleCacheTest<QDCache<string, int>>
 {

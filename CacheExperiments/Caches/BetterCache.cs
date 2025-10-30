@@ -1,4 +1,4 @@
-﻿namespace CacheExperiments;
+﻿namespace CacheExperiments.Caches;
 
 /// <summary>
 /// A simple & lightweight cache in less than 2⁷ lines of code

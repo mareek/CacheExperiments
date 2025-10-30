@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 
-namespace CacheExperiments;
+namespace CacheExperiments.Dictionaries;
 
 public class WorseDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue>
     where TKey : notnull
@@ -176,13 +176,13 @@ public class WorseDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TVa
     }
 
     ICollection<TKey> IDictionary<TKey, TValue>.Keys
-      => this.EnumerateEntries().Select(e => e.Key).ToArray();
+      => EnumerateEntries().Select(e => e.Key).ToArray();
 
     ICollection<TValue> IDictionary<TKey, TValue>.Values
-        => this.EnumerateEntries().Select(e => e.Value).ToArray();
+        => EnumerateEntries().Select(e => e.Value).ToArray();
 
     int ICollection<KeyValuePair<TKey, TValue>>.Count
-        => this.EnumerateEntries().Count();
+        => EnumerateEntries().Count();
 
     bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly => false;
 

@@ -1,4 +1,4 @@
-﻿namespace CacheExperiments;
+﻿namespace CacheExperiments.Caches;
 
 public abstract class BaseCacheAsync<TKey, TValue>
     where TKey : notnull

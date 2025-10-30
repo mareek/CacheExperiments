@@ -1,5 +1,4 @@
-﻿
-namespace CacheExperiments
+﻿namespace CacheExperiments.Caches
 {
     public interface ISimpleCache<TKey, TValue>
     {

@@ -1,4 +1,4 @@
-﻿namespace CacheExperiments;
+﻿namespace CacheExperiments.Caches;
 
 /// <summary>
 /// A quick and dirty cache

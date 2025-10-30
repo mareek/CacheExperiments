@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using BenchmarkDotNet.Attributes;
+using CacheExperiments.Dictionaries;
 
 namespace CacheExperiments;
 
