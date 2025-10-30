@@ -5,6 +5,26 @@ namespace CacheExperiments.Test;
 public class MyDictionaryTest
 {
     [Fact]
+    public void Bug()
+    {
+        // Benchmark: DictionaryBench.Fill10k_MyDic: DefaultJob [Count=64, CapacityFactor=0,0625]
+        int count = 64;
+        double capacityFactor = 0.0625;
+        int capacity = (int)(count * capacityFactor);
+        var _keys = Enumerable.Range(0, count).Select(i => Guid.NewGuid()).ToArray();
+
+        WorseDictionary<Guid, Guid> dic = new(capacity);
+        for (int i = 0; i < 10_000; i++)
+            Fill(dic);
+
+        void Fill(WorseDictionary<Guid, Guid> dic)
+        {
+            foreach (var key in _keys)
+                dic[key] = key;
+        }
+    }
+
+    [Fact]
     public void TestBasicFunction()
     {
         var myDic = CreateTestDic([3, 5, 13, 23, 33]);
@@ -56,9 +76,9 @@ public class MyDictionaryTest
         }
     }
 
-    private static MyDictionary<int, int> CreateTestDic(int[] keyValues)
+    private static BetterDictionary<int, int> CreateTestDic(int[] keyValues)
     {
-        MyDictionary<int, int> result = new(10);
+        BetterDictionary<int, int> result = new(10);
 
         foreach (int value in keyValues)
             result[value] = value;

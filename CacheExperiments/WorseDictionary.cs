@@ -3,12 +3,12 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace CacheExperiments;
 
-public class MyDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue>
+public class WorseDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue>
     where TKey : notnull
 {
     private static readonly EqualityComparer<TKey> KeyComparer = EqualityComparer<TKey>.Default;
     private static readonly EqualityComparer<TValue> ValueComparer = EqualityComparer<TValue>.Default;
-
+    
     private static bool KeyEquals(TKey left, TKey right) => KeyComparer.Equals(left, right);
 
     private readonly Entry?[] _entries = new Entry?[capacity];
@@ -39,29 +39,35 @@ public class MyDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue
 
     public bool Remove(TKey key)
     {
-        var bucket = GetBucket(key);
-        if (_entries[bucket] is not Entry entry)
+        var bucketIndex = GetBucketIndex(key);
+        if (_entries[bucketIndex] is not Entry entry)
             return false;
 
         if (KeyEquals(key, entry.Key))
         {
-            _entries[bucket] = entry.Next?.Entry;
+            _entries[bucketIndex] = entry.Next is EntryRef entryRef
+                                         ? entryRef.ToEntry() with { Next = entryRef.Next }
+                                         : null;
             return true;
         }
 
         if (entry.Next is not EntryRef currentRef)
             return false;
 
-        while (currentRef.Entry is Entry entryCur && !KeyEquals(key, entryCur.Key))
+        while (true)
         {
-            currentRef = entryCur.Next!;
+            if (KeyEquals(key, currentRef.Key))
+            {
+                var wasSet = currentRef.IsSet;
+                currentRef.IsSet = false;
+                return wasSet;
+            }
+
+            if (currentRef.Next is null)
+                return false;
+
+            currentRef = currentRef.Next;
         }
-
-        if (currentRef.Entry is not Entry entryToDelete)
-            return false;
-
-        currentRef.Entry = entryToDelete.Next?.Entry;
-        return true;
     }
 
     private TValue Get(TKey key)
@@ -71,7 +77,7 @@ public class MyDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue
 
     private void Set(TKey key, TValue value)
     {
-        var bucket = GetBucket(key);
+        var bucket = GetBucketIndex(key);
         if (_entries[bucket] is not Entry entry || KeyEquals(key, entry.Key))
         {
             _entries[bucket] = new(key, value);
@@ -80,40 +86,66 @@ public class MyDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue
 
         if (entry.Next is not EntryRef currentRef)
         {
-            _entries[bucket] = entry with { Next = new() { Entry = new(key, value) { Next = new() } } };
+            _entries[bucket] = entry with { Next = new(key, value) };
             return;
         }
 
-        while (currentRef.Entry is Entry entryCur && !KeyEquals(key, entryCur.Key))
+        EntryRef? availableSlot = null;
+        while (true)
         {
-            currentRef = entryCur.Next!;
-        }
+            if (KeyEquals(key, currentRef.Key))
+            {
+                currentRef.Value = value;
+                currentRef.IsSet = true;
+                return;
+            }
 
-        currentRef.Entry = new(key, value) { Next = new() };
+            if (!currentRef.IsSet)
+                availableSlot = currentRef;
+
+            if (currentRef.Next is null)
+            {
+                if (availableSlot is not null)
+                    availableSlot.Set(key, value);
+                else
+                    currentRef.Next = new(key, value);
+
+                return;
+            }
+
+            currentRef = currentRef.Next;
+        }
     }
 
-    private int GetBucket(TKey key) => Math.Abs(key.GetHashCode()) % _entries.Length;
+    private int GetBucketIndex(TKey key) => Math.Abs(key.GetHashCode()) % _entries.Length;
+
+    private Entry? GetBucket(TKey key) => _entries[Math.Abs(key.GetHashCode()) % _entries.Length];
 
     private Entry? GetEntry(TKey key)
-    {
-        var bucket = GetBucket(key);
-        var entry = _entries[bucket];
-        while (entry != null && !KeyEquals(key, entry.Value.Key))
-            entry = entry.Value.Next?.Entry;
-
-        return entry;
-    }
+        => EnumerateBucket(GetBucket(key)).Cast<Entry?>()
+                                          .FirstOrDefault(e => e.HasValue && KeyEquals(key, e.Value.Key));
 
     private IEnumerable<Entry> EnumerateEntries()
     {
         foreach (var bucket in _entries)
+            foreach (var entry in EnumerateBucket(bucket))
+                yield return entry;
+    }
+
+    private IEnumerable<Entry> EnumerateBucket(Entry? bucket)
+    {
+        if (bucket is not Entry entry)
+            yield break;
+
+        yield return entry;
+
+        var entryRef = entry.Next;
+        while (entryRef is not null)
         {
-            var entry = bucket;
-            while (entry is Entry realEntry)
-            {
-                yield return realEntry;
-                entry = realEntry.Next?.Entry;
-            }
+            if (entryRef.IsSet)
+                yield return entryRef.ToEntry();
+
+            entryRef = entryRef.Next;
         }
     }
 
@@ -126,9 +158,21 @@ public class MyDictionary<TKey, TValue>(int capacity) : IDictionary<TKey, TValue
         public KeyValuePair<TKey, TValue> ToKeyValue() => new(Key, Value);
     }
 
-    private class EntryRef
+    private class EntryRef(TKey key, TValue value)
     {
-        public Entry? Entry { get; set; }
+        public TKey Key { get; private set; } = key;
+        public TValue Value { get; set; } = value;
+        public bool IsSet { get; set; } = true;
+        public EntryRef? Next { get; set; }
+
+        public void Set(TKey key, TValue value)
+        {
+            Key = key;
+            Value = value;
+            IsSet = true;
+        }
+
+        public Entry ToEntry() => new(Key, Value);
     }
 
     ICollection<TKey> IDictionary<TKey, TValue>.Keys

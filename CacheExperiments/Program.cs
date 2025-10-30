@@ -1,4 +1,4 @@
 ﻿using BenchmarkDotNet.Running;
 using CacheExperiments;
 
-BenchmarkRunner.Run<CacheBench>();
+BenchmarkRunner.Run<DictionaryBench>();
