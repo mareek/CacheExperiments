@@ -1,9 +1,6 @@
 ﻿namespace CacheExperiments.Caches;
 
-/// <summary>
-/// A simple & lightweight cache in less than 2⁷ lines of code
-/// </summary>
-public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue>
+internal class ExpiringCache<TKey, TValue>(int capacity, TimeSpan lifetime): ISimpleCache<TKey, TValue>
     where TKey : notnull
 {
 #if NET9_OR_GREATER
@@ -13,6 +10,8 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
 #endif  
 
     private readonly Dictionary<TKey, int> _keysIndex = new(capacity);
+
+    private readonly TimeSpan _lifetime = lifetime;
 
     private readonly ListItem[] _items = new ListItem[capacity];
     private int _firstIndex = -1;
@@ -25,17 +24,27 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         lock (_lock)
         {
             TValue newValue;
-            if (_keysIndex.TryGetValue(key, out int index))
+            var expirationDate = DateTime.UtcNow.Add(_lifetime);
+            if (!_keysIndex.TryGetValue(key, out int index))
             {
-                var oldValue = GetValue(index);
-                newValue = updateValueFactory(key, oldValue);
-                SetValue(index, newValue);
+                // Key is not present in cache => we generate a new value
+                newValue = addValueFactory(key);
+                AddOnTop(key, newValue, expirationDate);
+            }
+            else if (_items[index].ExpirationDate <= DateTime.UtcNow)
+            {
+                // Key is present in the cache but expired => we generate a new value
+                newValue = addValueFactory(key);
+                SetValue(index, newValue, expirationDate);
                 MoveToTop(index);
             }
             else
             {
-                newValue = addValueFactory(key);
-                AddOnTop(key, newValue);
+                // Key is present in the cache and not expired => we update the stored value
+                var oldValue = GetValue(index);
+                newValue = updateValueFactory(key, oldValue);
+                SetValue(index, newValue, expirationDate);
+                MoveToTop(index);
             }
 
             return newValue;
@@ -47,24 +56,34 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         lock (_lock)
         {
             TValue value;
-            if (_keysIndex.TryGetValue(key, out int index))
+            if (!_keysIndex.TryGetValue(key, out int index))
             {
-                value = GetValue(index);
+                // Key is not present in cache => we generate a new value
+                var expirationDate = DateTime.UtcNow.Add(_lifetime);
+                value = factory(key);
+                AddOnTop(key, value, expirationDate);
+            }
+            else if (_items[index].ExpirationDate < DateTime.UtcNow)
+            {
+                // Key is present in the cache but expired => we generate a new value
+                value = factory(key);
+                SetValue(index, value, DateTime.UtcNow.Add(_lifetime));
                 MoveToTop(index);
             }
             else
             {
-                value = factory(key);
-                AddOnTop(key, value);
+                // Key is present in the cache and not expired => we return the stored value
+                value = GetValue(index);
+                MoveToTop(index);
             }
 
             return value;
         }
     }
 
-    private void AddOnTop(TKey key, TValue value)
+    private void AddOnTop(TKey key, TValue value, DateTime expirationDate)
     {
-        ListItem newItem = new(-1, key, value, _firstIndex);
+        ListItem newItem = new(-1, key, value, expirationDate, _firstIndex);
         if (_firstAvailbleIndex != -1) // there are still empty slots in _items
         {
             if (_firstIndex == -1) // first insertion
@@ -92,7 +111,8 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
 
     private TValue GetValue(int index) => _items[index].Value;
 
-    private void SetValue(int index, TValue newValue) => _items[index] = _items[index].WithValue(newValue);
+    private void SetValue(int index, TValue newValue, DateTime expirationDate)
+        => _items[index] = _items[index].WithValue(newValue, expirationDate);
 
     private void MoveToTop(int index)
     {
@@ -110,22 +130,24 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
         _firstIndex = index;
     }
 
-    private readonly struct ListItem(int previousIndex, TKey key, TValue value, int nextIndex)
+    private readonly struct ListItem(int previousIndex, TKey key, TValue value, DateTime expirationDate, int nextIndex)
     {
         public int PreviousIndex { get; } = previousIndex;
         public TKey Key { get; } = key;
         public TValue Value { get; } = value;
+        public DateTime ExpirationDate { get; } = expirationDate;
         public int NextIndex { get; } = nextIndex;
 
-        public ListItem WithPreviousIndex(int index) => new(index, Key, Value, NextIndex);
-        public ListItem WithNextIndex(int index) => new(PreviousIndex, Key, Value, index);
-        public ListItem WithValue(TValue value) => new(PreviousIndex, Key, value, NextIndex);
+        public ListItem WithPreviousIndex(int index) => new(index, Key, Value, ExpirationDate, NextIndex);
+        public ListItem WithNextIndex(int index) => new(PreviousIndex, Key, Value, ExpirationDate, index);
+        public ListItem WithValue(TValue value, DateTime expirationDate)
+            => new(PreviousIndex, Key, value, expirationDate, NextIndex);
     }
 }
 
-public class BetterCacheAsync<TKey, TValue>(int capacity) : BaseCacheAsync<TKey, TValue>()
+public class ExpiringCacheAsync<TKey, TValue>(int capacity, TimeSpan lifetime) : BaseCacheAsync<TKey, TValue>()
     where TKey : notnull
 {
     protected override ISimpleCache<TKey, Task<TValue>> BuildInnerCache()
-        => new BetterCache<TKey, Task<TValue>>(capacity);
+        => new ExpiringCache<TKey, Task<TValue>>(capacity, lifetime);
 }

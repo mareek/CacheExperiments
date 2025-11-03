@@ -5,9 +5,9 @@ public abstract class BaseCacheAsync<TKey, TValue>
 {
     private readonly ISimpleCache<TKey, Task<TValue>> _innerCache;
 
-    protected BaseCacheAsync(int capacity) => _innerCache = BuildInnerCache(capacity);
+    protected BaseCacheAsync() => _innerCache = BuildInnerCache();
 
-    protected abstract ISimpleCache<TKey, Task<TValue>> BuildInnerCache(int capacity);
+    protected abstract ISimpleCache<TKey, Task<TValue>> BuildInnerCache();
 
     public async Task<TValue> AddOrUpdateAsync(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
         => await _innerCache.AddOrUpdate(key,
