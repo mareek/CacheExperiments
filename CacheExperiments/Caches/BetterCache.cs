@@ -96,18 +96,27 @@ public class BetterCache<TKey, TValue>(int capacity) : ISimpleCache<TKey, TValue
 
     private void MoveToTop(int index)
     {
+        // if the item is already first we've got nothing to do
         if (index == _firstIndex)
             return;
 
         var item = _items[index];
 
+        // re remove the item from its position in the "chain" of items 
         _items[item.PreviousIndex] = _items[item.PreviousIndex].WithNextIndex(item.NextIndex);
-        if (item.NextIndex != -1)
+        if (item.NextIndex != -1) // same thing but backward
             _items[item.NextIndex] = _items[item.NextIndex].WithPreviousIndex(item.PreviousIndex);
 
+        // move the previous first item to the second place
         _items[_firstIndex] = _items[_firstIndex].WithPreviousIndex(index);
-        _items[index] = item.WithNextIndex(_firstIndex).WithPreviousIndex(-1);
+
+        // we put the item at the first place
+        _items[index] = new(-1, item.Key, item.Value, _firstIndex);
+
+        // update the "pointers"
         _firstIndex = index;
+        if (index == _lastIindex)
+            _lastIindex = item.PreviousIndex;
     }
 
     private readonly struct ListItem(int previousIndex, TKey key, TValue value, int nextIndex)

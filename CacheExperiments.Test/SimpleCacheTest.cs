@@ -55,4 +55,16 @@ public abstract class SimpleCacheTest<TCache> where TCache : ISimpleCache<string
         var first = cache.AddOrUpdate("0", _ => 0, (_, v) => v + 1);
         Check.That(first).Is(0);
     }
+
+    [Fact]
+    public void TestLastIndexBug()
+    {
+        TCache cache = NewCache(2);
+        cache.GetOrAdd("1", _ => 1);
+        cache.GetOrAdd("2", _ => 1);
+
+        cache.GetOrAdd("1", _ => 1);
+
+        cache.GetOrAdd("3", _ => 1);
+    }
 }
